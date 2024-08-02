@@ -1,19 +1,66 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/WeatherModel.dart';
+import '../models/ForecastModel.dart';
+import '../services/WeatherService.dart';
 
-class WeatherDetailsPage extends StatelessWidget {
+class WeatherDetailsPage extends StatefulWidget {
   final WeatherModel weather;
 
   const WeatherDetailsPage({super.key, required this.weather});
 
   @override
+  _WeatherDetailsPageState createState() => _WeatherDetailsPageState();
+}
+
+class _WeatherDetailsPageState extends State<WeatherDetailsPage> {
+  final WeatherService _weatherService = WeatherService();
+  List<ForecastModel> _forecast = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchForecast();
+  }
+
+  void _fetchForecast() async {
+    try {
+      final forecast = await _weatherService.get5DayForecastByCity(widget.weather.city);
+      final uniqueDaysForecast = _getUniqueDaysForecast(forecast);
+      setState(() {
+        _forecast = uniqueDaysForecast;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print("Error fetching forecast: $e");
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  List<ForecastModel> _getUniqueDaysForecast(List<ForecastModel> forecast) {
+    String todayDateKey = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    Map<String, ForecastModel> uniqueDays = {};
+    for (var item in forecast) {
+      String dateKey = DateFormat('yyyy-MM-dd').format(item.date);
+      if (dateKey != todayDateKey && !uniqueDays.containsKey(dateKey)) {
+        uniqueDays[dateKey] = item;
+      }
+    }
+    return uniqueDays.values.toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('${weather.city} Weather'),
+        title: Text('${widget.weather.city} Weather'),
       ),
-      body: Padding(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -23,6 +70,8 @@ class WeatherDetailsPage extends StatelessWidget {
             _currentTemp(),
             const SizedBox(height: 20),
             _extraInfo(),
+            const SizedBox(height: 20),
+            _forecastInfo(),
           ],
         ),
       ),
@@ -40,12 +89,12 @@ class WeatherDetailsPage extends StatelessWidget {
           decoration: BoxDecoration(
             image: DecorationImage(
               image: NetworkImage(
-                  "http://openweathermap.org/img/wn/${weather.weatherIcon}@4x.png"),
+                  "http://openweathermap.org/img/wn/${widget.weather.weatherIcon}@4x.png"),
             ),
           ),
         ),
         Text(
-          weather.weatherDescription,
+          widget.weather.weatherDescription,
           style: const TextStyle(
             color: Colors.black,
             fontSize: 20,
@@ -57,7 +106,7 @@ class WeatherDetailsPage extends StatelessWidget {
 
   Widget _currentTemp() {
     return Text(
-      "${weather.temperature.toStringAsFixed(0)}° C",
+      "${widget.weather.temperature.toStringAsFixed(0)}° C",
       style: const TextStyle(
         color: Colors.black,
         fontSize: 60,
@@ -83,14 +132,14 @@ class WeatherDetailsPage extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               Text(
-                "Max: ${weather.tempMax.toStringAsFixed(0)}° C",
+                "Max: ${widget.weather.tempMax.toStringAsFixed(0)}° C",
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,
                 ),
               ),
               Text(
-                "Min: ${weather.tempMin.toStringAsFixed(0)}° C",
+                "Min: ${widget.weather.tempMin.toStringAsFixed(0)}° C",
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,
@@ -102,14 +151,14 @@ class WeatherDetailsPage extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               Text(
-                "Wind: ${weather.windSpeed.toStringAsFixed(0)} m/s",
+                "Wind: ${widget.weather.windSpeed.toStringAsFixed(0)} m/s",
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,
                 ),
               ),
               Text(
-                "Humidity: ${weather.humidity.toStringAsFixed(0)}%",
+                "Humidity: ${widget.weather.humidity.toStringAsFixed(0)}%",
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 15,
@@ -119,6 +168,41 @@ class WeatherDetailsPage extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _forecastInfo() {
+    return Column(
+      children: [
+        const Text(
+          '5-Day Forecast',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _forecast.length,
+          itemBuilder: (context, index) {
+            final dayForecast = _forecast[index];
+            return Card(
+              child: ListTile(
+                title: Text(DateFormat('EEE, MMM d').format(dayForecast.date)),
+                subtitle: Text(dayForecast.weatherDescription),
+                trailing: Text(
+                  "${dayForecast.temperature.toStringAsFixed(0)}° C",
+                ),
+                leading: Image.network(
+                  "http://openweathermap.org/img/wn/${dayForecast.weatherIcon}.png",
+                ),
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 }
