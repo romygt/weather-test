@@ -30,15 +30,25 @@ class _HomePageState extends State<HomePage> {
             builder: (context) => WeatherDetailsPage(weather: weather),
           ),
         );
+      } else {
+        _showErrorSnackbar("Please enter a city name.");
       }
     } catch (e) {
-      // Handle error
-      print("Error fetching weather: $e");
+      _showErrorSnackbar('City not found');
     } finally {
       setState(() {
         _isLoading = false;
       });
     }
+  }
+
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+      ),
+    );
   }
 
   @override
